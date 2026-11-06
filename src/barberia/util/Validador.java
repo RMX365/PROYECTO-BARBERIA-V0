@@ -2,13 +2,27 @@ package barberia.util;
 
 import barberia.excepciones.DatoInvalidoException;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 
 /**
  * Validaciones reutilizables del sistema.
  */
 public final class Validador {
 
+    // Acepta "9:00" y "09:00"
+    private static final DateTimeFormatter FORMATO_HORA = DateTimeFormatter.ofPattern("H:mm");
+
     private Validador() {
+    }
+
+    /** Convierte un texto como "9:00" o "21:30" en una hora. */
+    public static LocalTime parsearHora(String texto) throws DatoInvalidoException {
+        try {
+            return LocalTime.parse(texto.trim(), FORMATO_HORA);
+        } catch (DateTimeParseException | NullPointerException e) {
+            throw new DatoInvalidoException("Use el formato HH:mm para las horas (ejemplo 09:00)");
+        }
     }
 
     public static void validarNombres(String nombres) throws DatoInvalidoException {
@@ -26,6 +40,48 @@ public final class Validador {
     public static void validarHorario(LocalTime inicio, LocalTime fin) throws DatoInvalidoException {
         if (inicio == null || fin == null || !fin.isAfter(inicio)) {
             throw new DatoInvalidoException("El horario de atención no es válido");
+        }
+    }
+
+    public static void validarNombreServicio(String nombre) throws DatoInvalidoException {
+        if (nombre == null || nombre.isBlank()) {
+            throw new DatoInvalidoException("El nombre del servicio es obligatorio");
+        }
+    }
+
+    public static void validarPrecio(double precio) throws DatoInvalidoException {
+        if (precio <= 0) {
+            throw new DatoInvalidoException("El precio debe ser mayor a 0");
+        }
+    }
+
+    public static void validarDuracion(int minutos) throws DatoInvalidoException {
+        if (minutos <= 0) {
+            throw new DatoInvalidoException("La duración debe ser mayor a 0");
+        }
+    }
+
+    /** Convierte "25", "25.5" o "25,5" en número. Si está vacío devuelve 0 (luego lo rechaza validarPrecio). */
+    public static double parsearPrecio(String texto) throws DatoInvalidoException {
+        if (texto == null || texto.isBlank()) {
+            return 0;
+        }
+        try {
+            double precio = Double.parseDouble(texto.trim().replace(',', '.'));
+            if (Double.isNaN(precio) || Double.isInfinite(precio)) {
+                throw new NumberFormatException();
+            }
+            return precio;
+        } catch (NumberFormatException e) {
+            throw new DatoInvalidoException("El precio debe ser un número");
+        }
+    }
+
+    public static int parsearDuracion(String texto) throws DatoInvalidoException {
+        try {
+            return Integer.parseInt(texto.trim());
+        } catch (NumberFormatException | NullPointerException e) {
+            throw new DatoInvalidoException("La duración debe ser un número entero de minutos");
         }
     }
 }
