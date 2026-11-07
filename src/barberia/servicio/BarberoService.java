@@ -27,4 +27,15 @@ public class BarberoService {
         repositorio.guardar(nuevo);
         return nuevo;
     }
+
+    /** Busca un barbero activo por su código. */
+    public Barbero obtenerActivo(String codigo) throws DatoInvalidoException {
+        String c = codigo.trim().toUpperCase();
+        Barbero barbero = repositorio.buscarPorCodigo(c)
+                .orElseThrow(() -> new DatoInvalidoException("No existe el barbero " + c));
+        if (!barbero.isActivo()) {
+            throw new DatoInvalidoException("El barbero " + c + " está inactivo");
+        }
+        return barbero;
+    }
 }

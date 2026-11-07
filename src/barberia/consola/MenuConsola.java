@@ -3,18 +3,30 @@ package barberia.consola;
 import barberia.excepciones.CelularDuplicadoException;
 import barberia.excepciones.ClienteNoEncontradoException;
 import barberia.excepciones.DatoInvalidoException;
+import barberia.excepciones.OperacionNoPermitidaException;
 import barberia.excepciones.ServicioDuplicadoException;
+import barberia.modelo.Atencion;
 import barberia.modelo.Barbero;
+import barberia.modelo.Cita;
 import barberia.modelo.Cliente;
 import barberia.modelo.Servicio;
+import barberia.repositorio.AtencionRepositorio;
+import barberia.repositorio.AtencionRepositorioMemoria;
 import barberia.repositorio.BarberoRepositorioMemoria;
+import barberia.repositorio.CitaRepositorio;
+import barberia.repositorio.CitaRepositorioMemoria;
 import barberia.repositorio.ClienteRepositorioMemoria;
 import barberia.repositorio.ServicioRepositorioMemoria;
+import barberia.servicio.AgendaService;
+import barberia.servicio.AtencionService;
 import barberia.servicio.BarberoService;
+import barberia.servicio.CajaService;
 import barberia.servicio.ClienteService;
 import barberia.servicio.ServicioService;
 import barberia.servicio.TotalesAtencion;
 import barberia.util.Validador;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,9 +39,19 @@ import java.util.Scanner;
 public class MenuConsola {
 
     private final Scanner teclado = new Scanner(System.in);
+    private final Clock reloj = Clock.systemDefaultZone();
+
     private final ClienteService clienteService = new ClienteService(new ClienteRepositorioMemoria());
     private final BarberoService barberoService = new BarberoService(new BarberoRepositorioMemoria());
     private final ServicioService servicioService = new ServicioService(new ServicioRepositorioMemoria());
+
+    private final CitaRepositorio citaRepositorio = new CitaRepositorioMemoria();
+    private final AtencionRepositorio atencionRepositorio = new AtencionRepositorioMemoria();
+    private final AgendaService agendaService =
+            new AgendaService(citaRepositorio, clienteService, barberoService, servicioService, reloj);
+    private final AtencionService atencionService =
+            new AtencionService(atencionRepositorio, citaRepositorio, clienteService, barberoService, servicioService, reloj);
+    private final CajaService cajaService = new CajaService(atencionRepositorio, reloj);
 
     public void iniciar() {
         int opcion;
@@ -45,6 +67,11 @@ public class MenuConsola {
                 case 6 -> verCatalogo();
                 case 7 -> crearCombo();
                 case 8 -> calcularAtencion();
+                case 9 -> agendarCita();
+                case 10 -> verHorarios();
+                case 11 -> marcarCita();
+                case 12 -> registrarAtencion();
+                case 13 -> registrarPago();
                 case 0 -> System.out.println("Hasta pronto.");
                 default -> System.out.println("[ERROR] Opción no válida");
             }
@@ -53,15 +80,24 @@ public class MenuConsola {
 
     private void mostrarMenu() {
         System.out.println("\n===== BARBERÍA =====");
-        System.out.println("1. Registrar cliente");
-        System.out.println("2. Editar cliente");
-        System.out.println("3. Buscar cliente");
-        System.out.println("4. Registrar barbero");
-        System.out.println("5. Registrar servicio");
-        System.out.println("6. Ver catálogo de servicios");
-        System.out.println("7. Crear combo");
-        System.out.println("8. Calcular precio y duración de una atención");
-        System.out.println("0. Salir");
+        System.out.println("-- Clientes y barberos --");
+        System.out.println(" 1. Registrar cliente");
+        System.out.println(" 2. Editar cliente");
+        System.out.println(" 3. Buscar cliente");
+        System.out.println(" 4. Registrar barbero");
+        System.out.println("-- Servicios --");
+        System.out.println(" 5. Registrar servicio");
+        System.out.println(" 6. Ver catálogo de servicios");
+        System.out.println(" 7. Crear combo");
+        System.out.println(" 8. Calcular precio y duración de una atención");
+        System.out.println("-- Citas --");
+        System.out.println(" 9. Agendar cita");
+        System.out.println("10. Ver horarios disponibles");
+        System.out.println("11. Marcar cita (atendida / inasistencia)");
+        System.out.println("-- Atención y caja --");
+        System.out.println("12. Registrar atención");
+        System.out.println("13. Registrar pago");
+        System.out.println(" 0. Salir");
         System.out.print("Elija una opción: ");
     }
 
@@ -205,6 +241,110 @@ public class MenuConsola {
             System.out.println(String.format(Locale.US, "[OK] Total: S/ %.2f | Duración: %d min",
                     totales.getPrecioTotal(), totales.getDuracionTotal()));
         } catch (DatoInvalidoException e) {
+            System.out.println("[ERROR] " + e.getMessage());
+        }
+    }
+
+    // ---------------- CITAS ----------------
+    private void agendarCita() {
+        System.out.println("\n--- Agendar cita ---");
+        String cliente = pedir("Código del cliente (ej. CLI-001): ");
+        String barbero = pedir("Código del barbero (ej. BAR-001): ");
+        String servicio = pedir("Código del servicio (ej. SER-001): ");
+        String fechaTexto = pedir("Fecha (dd/MM/aaaa): ");
+        String horaTexto = pedir("Hora (HH:mm): ");
+        try {
+            LocalDate fecha = fechaTexto.isBlank() ? null : Validador.parsearFecha(fechaTexto);
+            LocalTime hora = horaTexto.isBlank() ? null : Validador.parsearHora(horaTexto);
+            Cita cita = agendaService.agendar(cliente, barbero, servicio, fecha, hora);
+            System.out.println("[OK] Cita agendada correctamente: " + cita);
+        } catch (DatoInvalidoException | OperacionNoPermitidaException e) {
+            System.out.println("[ERROR] " + e.getMessage());
+        }
+    }
+
+    private void verHorarios() {
+        System.out.println("\n--- Horarios disponibles ---");
+        String barbero = pedir("Código del barbero (ej. BAR-001): ");
+        String fechaTexto = pedir("Fecha (dd/MM/aaaa): ");
+        String servicio = pedir("Código del servicio (ej. SER-001): ");
+        try {
+            LocalDate fecha = fechaTexto.isBlank() ? null : Validador.parsearFecha(fechaTexto);
+            List<LocalTime> libres = agendaService.horariosDisponibles(barbero, fecha, servicio);
+            if (libres.isEmpty()) {
+                System.out.println("No hay horarios disponibles en esta fecha");
+            } else {
+                System.out.println("Horarios libres (hora de inicio):");
+                StringBuilder fila = new StringBuilder("  ");
+                int contador = 0;
+                for (LocalTime h : libres) {
+                    fila.append(h).append("  ");
+                    contador++;
+                    if (contador % 6 == 0) {
+                        System.out.println(fila);
+                        fila = new StringBuilder("  ");
+                    }
+                }
+                if (contador % 6 != 0) {
+                    System.out.println(fila);
+                }
+            }
+        } catch (DatoInvalidoException e) {
+            System.out.println("[ERROR] " + e.getMessage());
+        }
+    }
+
+    private void marcarCita() {
+        System.out.println("\n--- Marcar cita ---");
+        String codigo = pedir("Código de la cita (ej. CIT-001): ");
+        String opcion = pedir("1 = Atendida, 2 = Inasistencia: ");
+        try {
+            Cita cita;
+            if (opcion.trim().equals("1")) {
+                cita = agendaService.marcarAtendida(codigo);
+                System.out.println("[OK] Cita marcada como atendida: " + cita);
+                System.out.println("     Ya puede registrar su atención (opción 12) y cobrarla (opción 13).");
+            } else if (opcion.trim().equals("2")) {
+                cita = agendaService.marcarInasistencia(codigo);
+                System.out.println("[OK] Cita marcada como inasistencia: " + cita);
+            } else {
+                System.out.println("[ERROR] Elija 1 o 2");
+            }
+        } catch (DatoInvalidoException | OperacionNoPermitidaException e) {
+            System.out.println("[ERROR] " + e.getMessage());
+        }
+    }
+
+    // ---------------- ATENCIÓN Y CAJA ----------------
+    private void registrarAtencion() {
+        System.out.println("\n--- Registrar atención ---");
+        String conCita = pedir("¿La atención tiene cita? (s/n): ");
+        try {
+            Atencion atencion;
+            if (conCita.trim().equalsIgnoreCase("s")) {
+                String cita = pedir("Código de la cita (ej. CIT-001): ");
+                String barbero = pedir("Código del barbero que atendió (Enter = el de la cita): ");
+                atencion = atencionService.registrarDesdeCita(cita, barbero);
+            } else {
+                String cliente = pedir("Código del cliente (ej. CLI-001): ");
+                String barbero = pedir("Código del barbero que atendió: ");
+                String servicios = pedir("Códigos de los servicios separados por coma: ");
+                atencion = atencionService.registrarSinCita(cliente, barbero, separarCodigos(servicios));
+            }
+            System.out.println("[OK] Atención registrada: " + atencion);
+        } catch (DatoInvalidoException | OperacionNoPermitidaException e) {
+            System.out.println("[ERROR] " + e.getMessage());
+        }
+    }
+
+    private void registrarPago() {
+        System.out.println("\n--- Registrar pago ---");
+        String codigo = pedir("Código de la atención (ej. ATE-001): ");
+        String metodo = pedir("Método de pago (1 = Efectivo, 2 = Yape, 3 = Tarjeta): ");
+        try {
+            Atencion atencion = cajaService.pagar(codigo, cajaService.crearMetodo(metodo));
+            System.out.println("[OK] Pago registrado: " + atencion);
+        } catch (DatoInvalidoException | OperacionNoPermitidaException e) {
             System.out.println("[ERROR] " + e.getMessage());
         }
     }

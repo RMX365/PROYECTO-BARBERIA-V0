@@ -1,9 +1,11 @@
 package barberia.util;
 
 import barberia.excepciones.DatoInvalidoException;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 
 /**
  * Validaciones reutilizables del sistema.
@@ -12,6 +14,9 @@ public final class Validador {
 
     // Acepta "9:00" y "09:00"
     private static final DateTimeFormatter FORMATO_HORA = DateTimeFormatter.ofPattern("H:mm");
+    // Acepta "3/11/2026" y "03/11/2026" y rechaza fechas que no existen (31/02/2026)
+    private static final DateTimeFormatter FORMATO_FECHA =
+            DateTimeFormatter.ofPattern("d/M/uuuu").withResolverStyle(ResolverStyle.STRICT);
 
     private Validador() {
     }
@@ -82,6 +87,22 @@ public final class Validador {
             return Integer.parseInt(texto.trim());
         } catch (NumberFormatException | NullPointerException e) {
             throw new DatoInvalidoException("La duración debe ser un número entero de minutos");
+        }
+    }
+
+    /** Convierte un texto como "3/11/2026" en una fecha. */
+    public static LocalDate parsearFecha(String texto) throws DatoInvalidoException {
+        try {
+            return LocalDate.parse(texto.trim(), FORMATO_FECHA);
+        } catch (DateTimeParseException | NullPointerException e) {
+            throw new DatoInvalidoException("Use el formato dd/MM/aaaa para la fecha (ejemplo 03/11/2026)");
+        }
+    }
+
+    /** Verifica que un dato obligatorio no esté vacío. */
+    public static void validarObligatorio(String valor, String campo) throws DatoInvalidoException {
+        if (valor == null || valor.isBlank()) {
+            throw new DatoInvalidoException("Falta indicar el dato: " + campo);
         }
     }
 }

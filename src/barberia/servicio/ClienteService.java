@@ -86,4 +86,15 @@ public class ClienteService {
         }
         return resultado;
     }
+
+    /** Busca un cliente activo por su código. */
+    public Cliente obtenerActivo(String codigo) throws DatoInvalidoException {
+        String c = codigo.trim().toUpperCase();
+        Cliente cliente = repositorio.buscarPorCodigo(c)
+                .orElseThrow(() -> new DatoInvalidoException("No existe el cliente " + c));
+        if (!cliente.isActivo()) {
+            throw new DatoInvalidoException("El cliente " + c + " está inactivo");
+        }
+        return cliente;
+    }
 }
