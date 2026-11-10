@@ -63,6 +63,7 @@ public class CajaService {
             throw new OperacionNoPermitidaException("No se pudo procesar el pago");
         }
         atencion.registrarPago(metodo, LocalDateTime.now(reloj));
+        atencion.getCliente().registrarVisita();   // REQ-CLI-07: cada atención pagada suma una visita
         atenciones.guardar(atencion);
         return atencion;
     }

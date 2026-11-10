@@ -19,6 +19,7 @@ public class Cita {
     private final LocalDate fecha;
     private final LocalTime horaInicio;
     private final int duracionMin;
+    private final double precio;
     private EstadoCita estado;
 
     public Cita(String codigo, Cliente cliente, Barbero barbero, Servicio servicio, LocalDate fecha, LocalTime horaInicio) {
@@ -28,7 +29,8 @@ public class Cita {
         this.servicio = servicio;
         this.fecha = fecha;
         this.horaInicio = horaInicio;
-        this.duracionMin = servicio.getDuracion();   // se guarda la duración vigente al agendar
+        this.duracionMin = servicio.getDuracion();   // se guardan la duración y el precio vigentes al agendar
+        this.precio = servicio.getPrecio();
         this.estado = EstadoCita.PENDIENTE;
     }
 
@@ -54,6 +56,14 @@ public class Cita {
 
     public LocalTime getHoraInicio() {
         return horaInicio;
+    }
+
+    public int getDuracionMin() {
+        return duracionMin;
+    }
+
+    public double getPrecio() {
+        return precio;
     }
 
     public EstadoCita getEstado() {

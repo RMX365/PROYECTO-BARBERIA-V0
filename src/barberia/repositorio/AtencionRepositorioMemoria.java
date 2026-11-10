@@ -36,6 +36,17 @@ public class AtencionRepositorioMemoria implements AtencionRepositorio {
     }
 
     @Override
+    public List<Atencion> buscarPorCliente(String codigoCliente) {
+        List<Atencion> resultado = new ArrayList<>();
+        for (Atencion a : atenciones.values()) {
+            if (a.getCliente().getCodigo().equals(codigoCliente)) {
+                resultado.add(a);
+            }
+        }
+        return resultado;
+    }
+
+    @Override
     public List<Atencion> obtenerTodos() {
         return new ArrayList<>(atenciones.values());
     }

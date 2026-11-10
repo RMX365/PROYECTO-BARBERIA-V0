@@ -14,6 +14,7 @@ import barberia.util.Validador;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -59,7 +60,9 @@ public class AtencionService {
         List<Servicio> lista = new ArrayList<>();
         lista.add(cita.getServicio());
 
-        Atencion nueva = new Atencion(atenciones.siguienteCodigo(), cita.getCliente(), barbero, cita, lista, cita.getFecha());
+        // el precio es el que tenía el servicio cuando se agendó la cita
+        Atencion nueva = new Atencion(atenciones.siguienteCodigo(), cita.getCliente(), barbero, cita, lista,
+                cita.getFecha(), cita.getPrecio());
         atenciones.guardar(nueva);
         return nueva;
     }
@@ -78,12 +81,15 @@ public class AtencionService {
         Cliente cliente = clientes.obtenerActivo(codigoCliente);
         Barbero barbero = barberos.obtenerActivo(codigoBarbero);
         List<Servicio> lista = new ArrayList<>();
+        double subtotal = 0;
         for (String c : codigosServicios) {
-            lista.add(servicios.obtenerActivo(c));
+            Servicio servicio = servicios.obtenerActivo(c);
+            lista.add(servicio);
+            subtotal += servicio.getPrecio();
         }
 
         Atencion nueva = new Atencion(atenciones.siguienteCodigo(), cliente, barbero, null, lista,
-                LocalDate.now(reloj));
+                LocalDate.now(reloj), subtotal);
         atenciones.guardar(nueva);
         return nueva;
     }
@@ -106,5 +112,19 @@ public class AtencionService {
         String codigo = codigoAtencion.trim().toUpperCase();
         return atenciones.buscarPorCodigo(codigo)
                 .orElseThrow(() -> new DatoInvalidoException("No existe la atención " + codigo));
+    }
+
+    /** REQ-CLI-06: atenciones pagadas de un cliente, de la más reciente a la más antigua. */
+    public List<Atencion> historialDeCliente(String codigoCliente) throws DatoInvalidoException {
+        Cliente cliente = clientes.obtener(codigoCliente);
+        List<Atencion> historial = new ArrayList<>();
+        for (Atencion a : atenciones.buscarPorCliente(cliente.getCodigo())) {
+            if (a.isPagada()) {
+                historial.add(a);
+            }
+        }
+        historial.sort(Comparator.comparing(Atencion::getFechaPago)
+                .thenComparing(Atencion::getCodigo).reversed());
+        return historial;
     }
 }

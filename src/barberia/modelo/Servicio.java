@@ -10,8 +10,8 @@ public abstract class Servicio {
 
     private final String codigo;
     private final String nombre;
-    private final double precio;
-    private final int duracionMin;
+    private double precio;
+    private int duracionMin;
     private boolean activo;
 
     public Servicio(String codigo, String nombre, double precio, int duracionMin) {
@@ -37,6 +37,12 @@ public abstract class Servicio {
     /** Duración en minutos. Un Combo la redefine sumando la de sus servicios. */
     public int getDuracion() {
         return duracionMin;
+    }
+
+    /** Cambia el precio y la duración. Las citas ya agendadas guardan su propia copia y no se alteran. */
+    public void actualizar(double precio, int duracionMin) {
+        this.precio = precio;
+        this.duracionMin = duracionMin;
     }
 
     public boolean isActivo() {

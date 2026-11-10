@@ -21,7 +21,7 @@ public class Atencion {
     private final Cita cita;                 // null si la atención no tuvo cita
     private final List<Servicio> servicios;
     private final LocalDate fecha;
-    private double subtotal;
+    private final double subtotal;           // se fija al registrar la atención
     private double montoDescuento;
     private double total;
     private boolean pagada;
@@ -29,23 +29,21 @@ public class Atencion {
     private LocalDateTime fechaPago;
     private double montoPagado;
 
-    public Atencion(String codigo, Cliente cliente, Barbero barbero, Cita cita, List<Servicio> servicios, LocalDate fecha) {
+    public Atencion(String codigo, Cliente cliente, Barbero barbero, Cita cita, List<Servicio> servicios,
+                    LocalDate fecha, double subtotal) {
         this.codigo = codigo;
         this.cliente = cliente;
         this.barbero = barbero;
         this.cita = cita;
         this.servicios = new ArrayList<>(servicios);
         this.fecha = fecha;
+        this.subtotal = subtotal;
         this.montoDescuento = 0;             // los descuentos se agregan en la semana 13
         calcularTotal();
     }
 
-    /** Calcula el subtotal (suma de precios) y el total (subtotal menos descuento). */
+    /** El total es el subtotal menos el descuento. */
     public double calcularTotal() {
-        subtotal = 0;
-        for (Servicio s : servicios) {
-            subtotal += s.getPrecio();
-        }
         total = subtotal - montoDescuento;
         return total;
     }
@@ -81,6 +79,14 @@ public class Atencion {
         return new ArrayList<>(servicios);
     }
 
+    public LocalDate getFecha() {
+        return fecha;
+    }
+
+    public double getSubtotal() {
+        return subtotal;
+    }
+
     public double getTotal() {
         return total;
     }
@@ -101,8 +107,7 @@ public class Atencion {
         return montoPagado;
     }
 
-    @Override
-    public String toString() {
+    private String nombresServicios() {
         StringBuilder nombres = new StringBuilder();
         for (Servicio s : servicios) {
             if (nombres.length() > 0) {
@@ -110,11 +115,22 @@ public class Atencion {
             }
             nombres.append(s.getNombre());
         }
+        return nombres.toString();
+    }
+
+    /** Línea para el historial del cliente: fecha, servicios, barbero y monto. */
+    public String resumenHistorial() {
+        return String.format(Locale.US, "%s | %s | Barbero: %s | S/ %.2f",
+                fecha.format(FORMATO_FECHA), nombresServicios(), barbero.getNombres(), montoPagado);
+    }
+
+    @Override
+    public String toString() {
         String estadoPago = pagada
                 ? String.format(Locale.US, "Pagada con %s (S/ %.2f)", metodoPago.getMetodo(), montoPagado)
                 : "Pendiente de pago";
         return String.format(Locale.US, "%s | %s | %s | Barbero: %s | %s | Total: S/ %.2f | %s",
                 codigo, fecha.format(FORMATO_FECHA), cliente.getNombres(), barbero.getNombres(),
-                nombres, total, estadoPago);
+                nombresServicios(), total, estadoPago);
     }
 }

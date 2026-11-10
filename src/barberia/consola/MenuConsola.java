@@ -2,6 +2,7 @@ package barberia.consola;
 
 import barberia.excepciones.CelularDuplicadoException;
 import barberia.excepciones.ClienteNoEncontradoException;
+import barberia.excepciones.ConfirmacionRequeridaException;
 import barberia.excepciones.DatoInvalidoException;
 import barberia.excepciones.OperacionNoPermitidaException;
 import barberia.excepciones.ServicioDuplicadoException;
@@ -22,6 +23,7 @@ import barberia.servicio.AtencionService;
 import barberia.servicio.BarberoService;
 import barberia.servicio.CajaService;
 import barberia.servicio.ClienteService;
+import barberia.servicio.EstadoFidelidad;
 import barberia.servicio.ServicioService;
 import barberia.servicio.TotalesAtencion;
 import barberia.util.Validador;
@@ -72,6 +74,11 @@ public class MenuConsola {
                 case 11 -> marcarCita();
                 case 12 -> registrarAtencion();
                 case 13 -> registrarPago();
+                case 14 -> listarClientes();
+                case 15 -> verHistorial();
+                case 16 -> verFidelidad();
+                case 17 -> modificarServicio();
+                case 18 -> desactivarServicio();
                 case 0 -> System.out.println("Hasta pronto.");
                 default -> System.out.println("[ERROR] Opción no válida");
             }
@@ -84,12 +91,17 @@ public class MenuConsola {
         System.out.println(" 1. Registrar cliente");
         System.out.println(" 2. Editar cliente");
         System.out.println(" 3. Buscar cliente");
+        System.out.println("14. Listar clientes");
+        System.out.println("15. Ver historial de un cliente");
+        System.out.println("16. Ver fidelidad de un cliente");
         System.out.println(" 4. Registrar barbero");
         System.out.println("-- Servicios --");
         System.out.println(" 5. Registrar servicio");
         System.out.println(" 6. Ver catálogo de servicios");
         System.out.println(" 7. Crear combo");
         System.out.println(" 8. Calcular precio y duración de una atención");
+        System.out.println("17. Modificar precio y duración de un servicio");
+        System.out.println("18. Desactivar un servicio");
         System.out.println("-- Citas --");
         System.out.println(" 9. Agendar cita");
         System.out.println("10. Ver horarios disponibles");
@@ -258,6 +270,7 @@ public class MenuConsola {
             LocalTime hora = horaTexto.isBlank() ? null : Validador.parsearHora(horaTexto);
             Cita cita = agendaService.agendar(cliente, barbero, servicio, fecha, hora);
             System.out.println("[OK] Cita agendada correctamente: " + cita);
+            mostrarFidelidad(cliente);
         } catch (DatoInvalidoException | OperacionNoPermitidaException e) {
             System.out.println("[ERROR] " + e.getMessage());
         }
@@ -332,6 +345,7 @@ public class MenuConsola {
                 atencion = atencionService.registrarSinCita(cliente, barbero, separarCodigos(servicios));
             }
             System.out.println("[OK] Atención registrada: " + atencion);
+            mostrarFidelidad(atencion.getCliente().getCodigo());
         } catch (DatoInvalidoException | OperacionNoPermitidaException e) {
             System.out.println("[ERROR] " + e.getMessage());
         }
@@ -344,7 +358,100 @@ public class MenuConsola {
         try {
             Atencion atencion = cajaService.pagar(codigo, cajaService.crearMetodo(metodo));
             System.out.println("[OK] Pago registrado: " + atencion);
+            mostrarFidelidad(atencion.getCliente().getCodigo());
         } catch (DatoInvalidoException | OperacionNoPermitidaException e) {
+            System.out.println("[ERROR] " + e.getMessage());
+        }
+    }
+
+    // ---------------- BLOQUE D: clientes y servicios ----------------
+    private void listarClientes() {
+        System.out.println("\n--- Listar clientes ---");
+        boolean inactivos = pedir("¿Mostrar clientes inactivos? (s/n): ").trim().equalsIgnoreCase("s");
+        List<Cliente> lista = clienteService.listar(inactivos);
+        if (lista.isEmpty()) {
+            System.out.println(clienteService.totalClientes() == 0
+                    ? "Aún no hay clientes registrados" : "No hay clientes activos");
+            return;
+        }
+        System.out.println(String.format("  %-9s %-28s %-11s %s", "Código", "Nombres", "Celular", "Estado"));
+        for (Cliente c : lista) {
+            System.out.println(String.format("  %-9s %-28s %-11s %s", c.getCodigo(), c.getNombres(),
+                    c.getCelular(), c.isActivo() ? "Activo" : "Inactivo"));
+        }
+    }
+
+    private void verHistorial() {
+        System.out.println("\n--- Historial de un cliente ---");
+        String codigo = pedir("Código del cliente (ej. CLI-001): ");
+        try {
+            List<Atencion> historial = atencionService.historialDeCliente(codigo);
+            if (historial.isEmpty()) {
+                System.out.println("El cliente aún no tiene atenciones");
+            } else {
+                System.out.println("Atenciones de " + clienteService.obtener(codigo).getNombres()
+                        + " (de la más reciente a la más antigua):");
+                for (Atencion a : historial) {
+                    System.out.println("  " + a.resumenHistorial());
+                }
+            }
+        } catch (DatoInvalidoException e) {
+            System.out.println("[ERROR] " + e.getMessage());
+        }
+    }
+
+    private void verFidelidad() {
+        System.out.println("\n--- Fidelidad de un cliente ---");
+        String codigo = pedir("Código del cliente (ej. CLI-001): ");
+        try {
+            EstadoFidelidad estado = clienteService.estadoFidelidad(codigo);
+            System.out.println("[OK] " + estado.getMensaje());
+        } catch (DatoInvalidoException e) {
+            System.out.println("[ERROR] " + e.getMessage());
+        }
+    }
+
+    private void mostrarFidelidad(String codigoCliente) {
+        try {
+            System.out.println("     Fidelidad: " + clienteService.estadoFidelidad(codigoCliente).getMensaje());
+        } catch (DatoInvalidoException e) {
+            // el código ya se validó antes; no hay nada más que mostrar
+        }
+    }
+
+    private void modificarServicio() {
+        System.out.println("\n--- Modificar servicio ---");
+        String codigo = pedir("Código del servicio (ej. SER-001): ");
+        String precioTexto = pedir("Nuevo precio (S/): ");
+        String duracionTexto = pedir("Nueva duración (minutos): ");
+        try {
+            double precio = Validador.parsearPrecio(precioTexto);
+            int duracion = Validador.parsearDuracion(duracionTexto);
+            Servicio s = servicioService.modificar(codigo, precio, duracion);
+            System.out.println("[OK] Servicio actualizado: " + s);
+            System.out.println("     Las citas ya agendadas conservan su precio y duración anteriores.");
+        } catch (DatoInvalidoException | OperacionNoPermitidaException e) {
+            System.out.println("[ERROR] " + e.getMessage());
+        }
+    }
+
+    private void desactivarServicio() {
+        System.out.println("\n--- Desactivar servicio ---");
+        String codigo = pedir("Código del servicio (ej. SER-001): ");
+        try {
+            Servicio s;
+            try {
+                s = servicioService.desactivar(codigo, false);
+            } catch (ConfirmacionRequeridaException aviso) {
+                System.out.println("[AVISO] " + aviso.getMessage());
+                if (!pedir("¿Desea continuar? (s/n): ").trim().equalsIgnoreCase("s")) {
+                    System.out.println("Operación cancelada");
+                    return;
+                }
+                s = servicioService.desactivar(codigo, true);
+            }
+            System.out.println("[OK] Servicio desactivado: " + s);
+        } catch (DatoInvalidoException | ConfirmacionRequeridaException e) {
             System.out.println("[ERROR] " + e.getMessage());
         }
     }

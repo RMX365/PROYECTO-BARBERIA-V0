@@ -7,19 +7,29 @@ import barberia.modelo.Cliente;
 import barberia.repositorio.ClienteRepositorio;
 import barberia.util.Validador;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
 /**
  * Lógica de negocio de los clientes:
- * REQ-CLI-01 (registrar), REQ-CLI-02 (editar), REQ-CLI-03 (buscar) y REQ-CLI-05 (celular único).
+ * REQ-CLI-01 (registrar), 02 (editar), 03 (buscar), 04 (listar), 05 (celular único) y 07 (fidelidad).
  */
 public class ClienteService {
 
+    /** Visitas que necesita un cliente para tener el descuento por fidelidad (valor por defecto). */
+    public static final int VISITAS_PARA_DESCUENTO = 5;
+
     private final ClienteRepositorio repositorio;
+    private final int visitasParaDescuento;
 
     public ClienteService(ClienteRepositorio repositorio) {
+        this(repositorio, VISITAS_PARA_DESCUENTO);
+    }
+
+    public ClienteService(ClienteRepositorio repositorio, int visitasParaDescuento) {
         this.repositorio = repositorio;
+        this.visitasParaDescuento = visitasParaDescuento;
     }
 
     /** REQ-CLI-01 y REQ-CLI-05. */
@@ -87,13 +97,42 @@ public class ClienteService {
         return resultado;
     }
 
+    /** REQ-CLI-04: lista los clientes ordenados por nombres; los inactivos solo si se pide. */
+    public List<Cliente> listar(boolean incluirInactivos) {
+        List<Cliente> lista = new ArrayList<>();
+        for (Cliente c : repositorio.obtenerTodos()) {
+            if (incluirInactivos || c.isActivo()) {
+                lista.add(c);
+            }
+        }
+        lista.sort(Comparator.comparing(c -> c.getNombres().toLowerCase()));
+        return lista;
+    }
+
+    /** Cantidad total de clientes registrados (activos e inactivos). */
+    public int totalClientes() {
+        return repositorio.obtenerTodos().size();
+    }
+
+    /** REQ-CLI-07: visitas acumuladas y si ya le corresponde el descuento por fidelidad. */
+    public EstadoFidelidad estadoFidelidad(String codigo) throws DatoInvalidoException {
+        Cliente cliente = obtener(codigo);
+        return new EstadoFidelidad(cliente.getVisitas(), visitasParaDescuento);
+    }
+
+    /** Busca un cliente por su código (activo o no). */
+    public Cliente obtener(String codigo) throws DatoInvalidoException {
+        Validador.validarObligatorio(codigo, "cliente");
+        String c = codigo.trim().toUpperCase();
+        return repositorio.buscarPorCodigo(c)
+                .orElseThrow(() -> new DatoInvalidoException("No existe el cliente " + c));
+    }
+
     /** Busca un cliente activo por su código. */
     public Cliente obtenerActivo(String codigo) throws DatoInvalidoException {
-        String c = codigo.trim().toUpperCase();
-        Cliente cliente = repositorio.buscarPorCodigo(c)
-                .orElseThrow(() -> new DatoInvalidoException("No existe el cliente " + c));
+        Cliente cliente = obtener(codigo);
         if (!cliente.isActivo()) {
-            throw new DatoInvalidoException("El cliente " + c + " está inactivo");
+            throw new DatoInvalidoException("El cliente " + cliente.getCodigo() + " está inactivo");
         }
         return cliente;
     }

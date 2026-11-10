@@ -1,6 +1,8 @@
 package barberia.servicio;
 
+import barberia.excepciones.ConfirmacionRequeridaException;
 import barberia.excepciones.DatoInvalidoException;
+import barberia.excepciones.OperacionNoPermitidaException;
 import barberia.excepciones.ServicioDuplicadoException;
 import barberia.modelo.Barba;
 import barberia.modelo.Cejas;
@@ -113,6 +115,59 @@ public class ServicioService {
             throw new DatoInvalidoException("El servicio " + c + " está inactivo");
         }
         return s;
+    }
+
+    /** REQ-SER-02: cambia el precio y la duración de un servicio simple. Las citas ya agendadas no cambian. */
+    public Servicio modificar(String codigo, double precio, int duracionMin)
+            throws DatoInvalidoException, OperacionNoPermitidaException {
+        Servicio servicio = obtenerActivo(codigo);
+        if (servicio instanceof Combo) {
+            throw new OperacionNoPermitidaException(
+                    "Un combo no se modifica: cree uno nuevo con el precio que desea");
+        }
+        Validador.validarPrecio(precio);
+        Validador.validarDuracion(duracionMin);
+        servicio.actualizar(precio, duracionMin);
+        repositorio.guardar(servicio);
+        return servicio;
+    }
+
+    /**
+     * REQ-SER-04: desactiva un servicio. Si forma parte de combos activos, pide confirmación
+     * y, al confirmar, esos combos también se desactivan.
+     */
+    public Servicio desactivar(String codigo, boolean confirmado)
+            throws DatoInvalidoException, ConfirmacionRequeridaException {
+        Servicio servicio = obtenerActivo(codigo);
+        List<Combo> afectados = combosActivosQueUsan(servicio);
+        if (!afectados.isEmpty() && !confirmado) {
+            StringBuilder nombres = new StringBuilder();
+            for (Combo c : afectados) {
+                if (nombres.length() > 0) {
+                    nombres.append(", ");
+                }
+                nombres.append(c.getNombre());
+            }
+            throw new ConfirmacionRequeridaException("El servicio forma parte de los combos: " + nombres
+                    + ". Si lo desactiva, esos combos también se desactivarán");
+        }
+        for (Combo c : afectados) {
+            c.desactivar();
+            repositorio.guardar(c);
+        }
+        servicio.desactivar();
+        repositorio.guardar(servicio);
+        return servicio;
+    }
+
+    private List<Combo> combosActivosQueUsan(Servicio servicio) {
+        List<Combo> combos = new ArrayList<>();
+        for (Servicio s : repositorio.obtenerTodos()) {
+            if (s instanceof Combo && s.isActivo() && ((Combo) s).getServicios().contains(servicio)) {
+                combos.add((Combo) s);
+            }
+        }
+        return combos;
     }
 
     private void verificarNombreLibre(String nombre) throws ServicioDuplicadoException {

@@ -15,6 +15,8 @@ public interface AtencionRepositorio {
 
     Optional<Atencion> buscarPorCita(String codigoCita);
 
+    List<Atencion> buscarPorCliente(String codigoCliente);
+
     List<Atencion> obtenerTodos();
 
     String siguienteCodigo();
